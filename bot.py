@@ -263,10 +263,10 @@ def throw_snowball_to_user(call, target_user_id):
     if outcome <= 50:
         # Попал в цель
         bot.send_message(target_user_id, f'{call.from_user.first_name} кинул в вас снежком и попал! ❄️')
-        bot.reply_to(call, f'Вы попали в {target_full_name} снежком! ❄️')
+        bot.reply_to(call.message, f'Вы попали в {target_full_name} снежком! ❄️')
     elif outcome <= 80:
         # Промазал
-        bot.reply_to(call, f'Вы промазали и не попали в {target_full_name}. 🎯')
+        bot.reply_to(call.message, f'Вы промазали и не попали в {target_full_name}. 🎯')
     else:
         # Попал в кого-то другого
         if participant_count > 2:
