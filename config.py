@@ -1,0 +1,3 @@
+BOT_TOKEN = '7383270419:AAG6ZTkjJK6xRmXDqYM8bhY8u6HwN1IhNEA'
+DATABASE = 'secret_santa.db'
+ADMIN_PASSWORD = 'piskabobrabebra123'
