@@ -278,11 +278,11 @@ def throw_snowball_to_user(call, target_user_id):
             if other_participants:
                 other_user_id = random.choice(other_participants)[0]
                 bot.send_message(other_user_id, f'{call.from_user.first_name} кинул снежком и попал в вас! ❄️')
-                bot.reply_to(call, f'Вы промазали и попали в кого-то другого! ❄️')
+                bot.reply_to(call.message, f'Вы промазали и попали в кого-то другого! ❄️')
             else:
-                bot.reply_to(call, f'Вы промазали и не попали в {target_full_name}. 🎯')
+                bot.reply_to(call.message, f'Вы промазали и не попали в {target_full_name}. 🎯')
         else:
-            bot.reply_to(call, f'Вы промазали и не попали в {target_full_name}. 🎯')
+            bot.reply_to(call.message, f'Вы промазали и не попали в {target_full_name}. 🎯')
 
 def notify_all_participants(message_text):
     conn = sqlite3.connect(DATABASE)
