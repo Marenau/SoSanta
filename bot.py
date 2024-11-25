@@ -1,8 +1,10 @@
 import telebot
 import sqlite3
 import random
+import os
 from config import BOT_TOKEN, DATABASE, ADMIN_PASSWORD
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from mistralai import Mistral
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -60,6 +62,7 @@ def send_welcome(message):
     markup.add(InlineKeyboardButton('Список участников', callback_data='list'))
     markup.add(InlineKeyboardButton('Кинуть снежком', callback_data='snowball'))
     markup.add(InlineKeyboardButton('Мой профиль', callback_data='profile'))
+    markup.add(InlineKeyboardButton('Новогодний рассказ', callback_data='story'))
     bot.reply_to(message, 'Добро пожаловать в бота "Тайный Санта"! 🎅', reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -86,6 +89,8 @@ def handle_callback(call):
         clear_participants(call)
     elif call.data == 'profile':
         show_profile(call)
+    elif call.data == 'story':
+        generate_story(call)
 
 def join(call):
     user_id = call.from_user.id
@@ -350,6 +355,51 @@ def show_profile(call):
     markup.add(InlineKeyboardButton('Админ', callback_data='admin'))
 
     bot.send_message(call.message.chat.id, profile_text, reply_markup=markup)
+
+def generate_story(call):
+    user_id = call.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name FROM participants')
+    participants = cursor.fetchall()
+    conn.close()
+
+    if not participants:
+        bot.reply_to(call.message, 'Пока нет участников для генерации истории. 😞')
+        return
+
+    # Выбираем случайных участников
+    selected_participants = random.sample(participants, random.randint(1, len(participants)))
+    participant_names = [f'{row[0]} {row[1]}' if row[1] else row[0] for row in selected_participants]
+
+    # Выбираем случайное настроение
+    moods = ['Веселая история', 'Смешная история', 'Кринжовая история']
+    mood = random.choice(moods)
+
+    # Формируем запрос к Mistral API
+    prompt = (
+        f"Ты профессиональный писатель историй, ты пишешь очень интересные истории, очень красивым языком, ты владеешь написанием рассказов и историй в мастерстве. "
+        f"Тебе нужно написать короткий новогодний рассказ с законченной концовкой. Ты должен ответить мне только историей и ничем больше, ничего лишнего писать не надо, "
+        f"от тебя я должен получить только историю. При написании истории ориентируйся на пол участника по имени и используй соответствующие склонения/спряжения и местоимения. "
+        f"При каждом моем сообщении пиши разные рассказы, они не должны повторятся. Тема: Новый год, новогодняя тематика, новогодние развлечения. Участники: {', '.join(participant_names)}. Настроение: {mood}"
+    )
+
+    # Отправляем запрос к Mistral API
+    api_key = 'utxpKKoTJR5vVUs99Y1i5cnfS7eJ7IG5'
+    model = "mistral-large-latest"
+    client = Mistral(api_key=api_key)
+    chat_response = client.chat.complete(
+        model=model,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ]
+    )
+
+    # Отправляем ответ пользователю
+    bot.send_message(call.message.chat.id, chat_response.choices[0].message.content)
 
 if __name__ == '__main__':
     bot.polling()
