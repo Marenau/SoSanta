@@ -112,7 +112,9 @@ def save_wish(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
     wish = call.text
@@ -138,7 +140,9 @@ def leave(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
     user_id = call.from_user.id
@@ -158,7 +162,9 @@ def admin_login(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
     user_id = call.from_user.id
@@ -195,7 +201,9 @@ def start_game(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
     conn = sqlite3.connect(DATABASE)
@@ -241,7 +249,9 @@ def list_participants(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
     conn = sqlite3.connect(DATABASE)
@@ -264,7 +274,9 @@ def clear_participants(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
     
     conn = sqlite3.connect(DATABASE)
@@ -285,7 +297,9 @@ def throw_snowball(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
     conn = sqlite3.connect(DATABASE)
@@ -316,7 +330,9 @@ def throw_snowball_to_user(call, target_user_id):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
     conn = sqlite3.connect(DATABASE)
@@ -387,7 +403,9 @@ def change_wish(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
     conn = sqlite3.connect(DATABASE)
@@ -404,15 +422,17 @@ def change_wish(call):
     user_states[user_id] = 'waiting_for_wish_change'
 
 @bot.message_handler(func=lambda call: user_states.get(call.from_user.id) == 'waiting_for_wish_change')
-def save_changed_wish(call):
-    user_id = call.from_user.id
-    wish = call.text
+def save_changed_wish(message):
+    user_id = message.from_user.id
+    wish = message.text
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('UPDATE participants SET wish = ? WHERE user_id = ?', (wish, user_id))
     conn.commit()
     conn.close()
-    bot.reply_to(call, 'Ваше пожелание изменено! 🎁')
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton('Мой профиль', callback_data='profile'))
+    bot.send_message(message.chat.id, 'Ваше пожелание изменено! 🎁', reply_markup=markup)
     user_states[user_id] = None
 
 def show_profile(call):
@@ -424,7 +444,9 @@ def show_profile(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
     conn = sqlite3.connect(DATABASE)
@@ -452,7 +474,9 @@ def generate_story(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
         
     conn = sqlite3.connect(DATABASE)
@@ -481,6 +505,9 @@ def generate_story(call):
         f"При каждом моем сообщении пиши разные рассказы, они не должны повторятся. В истории не должно быть романтического подтекста. Тема: Новый год, новогодняя тематика, новогодние развлечения. Участники: {', '.join(participant_names)}. Настроение: {mood}"
     )
 
+    # Отправляем сообщение пользователю, что нужно немного подождать
+    bot.send_message(call.message.chat.id, 'Пожалуйста, подождите немного, пока генерируется ваша история...')
+
     # Отправляем запрос к Mistral API
     api_key = 'utxpKKoTJR5vVUs99Y1i5cnfS7eJ7IG5'
     model = "mistral-large-latest"
@@ -507,15 +534,17 @@ def show_menu(message):
     conn.close()
 
     if user_info is None:
-        bot.send_message(message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы открыть меню действий.')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        bot.send_message(message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы открыть меню действий.', reply_markup=markup)
         return
 
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton('Покинуть игру', callback_data='leave'))
     markup.add(InlineKeyboardButton('Список участников', callback_data='list'))
     markup.add(InlineKeyboardButton('Кинуть снежок', callback_data='snowball'))
-    markup.add(InlineKeyboardButton('Мой профиль', callback_data='profile'))
     markup.add(InlineKeyboardButton('Новогодний рассказ', callback_data='story'))
+    markup.add(InlineKeyboardButton('Мой профиль', callback_data='profile'))
     bot.send_message(message.chat.id, 'Меню действий:', reply_markup=markup)
 
 if __name__ == '__main__':
