@@ -1,9 +1,8 @@
 import telebot
 import sqlite3
 import random
-import os
 from config import BOT_TOKEN, DATABASE, ADMIN_PASSWORD
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup
 from mistralai import Mistral
 
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -58,16 +57,10 @@ game_started = False
 def send_welcome(message):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
-    markup.add(InlineKeyboardButton('Покинуть игру', callback_data='leave'))
-    markup.add(InlineKeyboardButton('Список участников', callback_data='list'))
-    markup.add(InlineKeyboardButton('Кинуть снежком', callback_data='snowball'))
-    markup.add(InlineKeyboardButton('Мой профиль', callback_data='profile'))
-    markup.add(InlineKeyboardButton('Новогодний рассказ', callback_data='story'))
     bot.reply_to(message, 'Добро пожаловать в бота "Тайный Санта"! 🎅', reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
-    print(f"Callback from user ID: {call.from_user.id}")
     if call.data == 'join':
         join(call)
     elif call.data == 'leave':
@@ -92,6 +85,10 @@ def handle_callback(call):
     elif call.data == 'story':
         generate_story(call)
 
+@bot.message_handler(func=lambda message: message.text.lower() == 'меню')
+def handle_menu_command(message):
+    show_menu(message)
+
 def join(call):
     user_id = call.from_user.id
     first_name = call.from_user.first_name
@@ -108,17 +105,42 @@ def join(call):
 @bot.message_handler(func=lambda call: user_states.get(call.from_user.id) == 'waiting_for_wish')
 def save_wish(call):
     user_id = call.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
+
+    if user_info is None:
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        return
+
     wish = call.text
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('UPDATE participants SET wish = ? WHERE user_id = ?', (wish, user_id))
     conn.commit()
     conn.close()
-    bot.reply_to(call, 'Вы присоединились к игре "Тайный Санта"! 🎉')
+
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(InlineKeyboardButton('Меню'))
+
+    bot.reply_to(call, 'Вы присоединились к игре "Тайный Санта"! 🎉', reply_markup=markup)
     notify_all_participants(f'{call.from_user.first_name} {call.from_user.last_name if call.from_user.last_name else ""} присоединился к игре! 🎅')
     user_states[user_id] = None
 
 def leave(call):
+    user_id = call.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
+
+    if user_info is None:
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        return
+
     user_id = call.from_user.id
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
@@ -128,6 +150,17 @@ def leave(call):
     bot.reply_to(call.message, 'Вы покинули игру "Тайный Санта". 😞')
 
 def admin_login(call):
+    user_id = call.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
+
+    if user_info is None:
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        return
+
     user_id = call.from_user.id
     admin_states[user_id] = 'waiting_for_password'
     bot.reply_to(call.message, 'Пожалуйста, введите пароль администратора: 🔒')
@@ -153,14 +186,20 @@ def check_admin_password(call):
 
 def start_game(call):
     global game_started
+
     user_id = call.from_user.id
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    cursor.execute('SELECT user_id FROM admins WHERE user_id = ?', (user_id,))
-    admin = cursor.fetchone()
-    if not admin:
-        bot.reply_to(call.message, 'У вас нет прав администратора для выполнения этой команды. 🚫')
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
+
+    if user_info is None:
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
         return
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
 
     cursor.execute('SELECT user_id, first_name, last_name, wish FROM participants')
     participants = cursor.fetchall()
@@ -194,6 +233,17 @@ def start_game(call):
     bot.reply_to(call.message, 'Игра "Тайный Санта" началась! Проверьте свои личные сообщения, чтобы узнать, кому вы Тайный Санта. 🎁')
 
 def list_participants(call):
+    user_id = call.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
+
+    if user_info is None:
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        return
+
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('SELECT first_name, last_name FROM participants')
@@ -209,12 +259,16 @@ def clear_participants(call):
     user_id = call.from_user.id
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    cursor.execute('SELECT user_id FROM admins WHERE user_id = ?', (user_id,))
-    admin = cursor.fetchone()
-    if not admin:
-        bot.reply_to(call.message, 'У вас нет прав администратора для выполнения этой команды. 🚫')
-        return
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
 
+    if user_info is None:
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        return
+    
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
     cursor.execute('DELETE FROM participants')
     cursor.execute('DELETE FROM assignments')
     cursor.execute('UPDATE game_status SET status = "not_started"')
@@ -226,27 +280,43 @@ def throw_snowball(call):
     user_id = call.from_user.id
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
+
+    if user_info is None:
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        return
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
     cursor.execute('SELECT user_id, first_name, last_name FROM participants')
     participants = cursor.fetchall()
     conn.close()
 
-    if participants:
+    # Проверка, есть ли другие участники кроме текущего пользователя
+    other_participants = [participant for participant in participants if participant[0] != user_id]
+
+    if other_participants:
         markup = InlineKeyboardMarkup()
-        for participant in participants:
+        for participant in other_participants:
             target_user_id, first_name, last_name = participant
-            if target_user_id != user_id:  # Исключаем текущего пользователя
-                full_name = f'{first_name} {last_name}' if last_name else first_name
-                markup.add(InlineKeyboardButton(full_name, callback_data=f'snowball_{target_user_id}'))
-        bot.reply_to(call.message, 'Выберите участника, в которого хотите кинуть снежком:', reply_markup=markup)
+            full_name = f'{first_name} {last_name}' if last_name else first_name
+            markup.add(InlineKeyboardButton(full_name, callback_data=f'snowball_{target_user_id}'))
+        bot.reply_to(call.message, 'Выберите участника, в которого хотите кинуть снежок:', reply_markup=markup)
     else:
-        bot.reply_to(call.message, 'Пока нет участников. 😞')
+        bot.reply_to(call.message, 'Пока нет других участников. 😞')
 
 def throw_snowball_to_user(call, target_user_id):
     user_id = call.from_user.id
-    target_user_id = int(target_user_id)
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
 
-    if user_id == target_user_id:
-        bot.reply_to(call.message, 'Вы не можете кинуть снежком в самого себя. 😞')
+    if user_info is None:
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
         return
 
     conn = sqlite3.connect(DATABASE)
@@ -260,14 +330,14 @@ def throw_snowball_to_user(call, target_user_id):
     if target_user_name:
         target_full_name = f'{target_user_name[0]} {target_user_name[1]}' if target_user_name[1] else target_user_name[0]
     else:
-        bot.reply_to(call.message, 'Участник с таким ID не найден. 😞')
+        bot.reply_to(call.message, 'Участник не найден. 😞')
         return
 
     outcome = random.randint(1, 100)
 
     if outcome <= 50:
         # Попал в цель
-        bot.send_message(target_user_id, f'{call.from_user.first_name} кинул в вас снежком и попал! ❄️')
+        bot.send_message(target_user_id, f'{call.from_user.first_name} кинул в вас снежок и попал! ❄️')
         bot.reply_to(call.message, f'Вы попали в {target_full_name} снежком! ❄️')
     elif outcome <= 80:
         # Промазал
@@ -283,7 +353,7 @@ def throw_snowball_to_user(call, target_user_id):
             if other_participants:
                 other_user_id, other_first_name, other_last_name = random.choice(other_participants)
                 other_user_name = f'{other_first_name} {other_last_name}' if other_last_name else other_first_name
-                bot.send_message(other_user_id, f'{call.from_user.first_name} кинул снежком и попал в вас! ❄️')
+                bot.send_message(other_user_id, f'{call.from_user.first_name} кинул снежок и попал в вас! ❄️')
                 bot.reply_to(call.message, f'Вы промазали и попали в кого-то другого! Это был {other_user_name}! ❄️')
             else:
                 bot.reply_to(call.message, f'Вы промазали и не попали в {target_full_name}. 🎯')
@@ -308,6 +378,18 @@ def notify_all_participants(message_text):
 
 def change_wish(call):
     global game_started
+
+    user_id = call.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
+
+    if user_info is None:
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        return
+
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('SELECT status FROM game_status')
@@ -335,8 +417,6 @@ def save_changed_wish(call):
 
 def show_profile(call):
     user_id = call.from_user.id
-    print(f"User ID in show_profile: {user_id}")  # Логирование для отладки
-
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
@@ -344,8 +424,14 @@ def show_profile(call):
     conn.close()
 
     if user_info is None:
-        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы увидеть свой профиль.')
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
         return
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
 
     first_name, last_name, wish = user_info
     full_name = f'{first_name} {last_name}' if last_name else first_name
@@ -359,6 +445,16 @@ def show_profile(call):
 
 def generate_story(call):
     user_id = call.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
+
+    if user_info is None:
+        bot.send_message(call.message, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.')
+        return
+        
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('SELECT first_name, last_name FROM participants')
@@ -401,6 +497,26 @@ def generate_story(call):
 
     # Отправляем ответ пользователю
     bot.send_message(call.message.chat.id, chat_response.choices[0].message.content)
+
+def show_menu(message):
+    user_id = message.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
+    user_info = cursor.fetchone()
+    conn.close()
+
+    if user_info is None:
+        bot.send_message(message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы открыть меню действий.')
+        return
+
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton('Покинуть игру', callback_data='leave'))
+    markup.add(InlineKeyboardButton('Список участников', callback_data='list'))
+    markup.add(InlineKeyboardButton('Кинуть снежок', callback_data='snowball'))
+    markup.add(InlineKeyboardButton('Мой профиль', callback_data='profile'))
+    markup.add(InlineKeyboardButton('Новогодний рассказ', callback_data='story'))
+    bot.send_message(message.chat.id, 'Меню действий:', reply_markup=markup)
 
 if __name__ == '__main__':
     bot.polling()
