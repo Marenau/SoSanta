@@ -56,8 +56,8 @@ game_started = False
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
-    bot.reply_to(message, 'Добро пожаловать в бота "Тайный Санта"! 🎅', reply_markup=markup)
+    markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
+    bot.reply_to(message, 'Добро пожаловать в волшебный мир "Тайного Санты"! 🎄✨', reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
@@ -99,7 +99,7 @@ def join(call):
     conn.commit()
     conn.close()
 
-    bot.send_message(call.message.chat.id, 'Пожалуйста, напишите ваше пожелание (подарок, который вы хотите):')
+    bot.send_message(call.message.chat.id, 'Пожалуйста, напишите ваше новогоднее пожелание (подарок, который вы хотите): 🎁')
     user_states[user_id] = 'waiting_for_wish'
 
 @bot.message_handler(func=lambda call: user_states.get(call.from_user.id) == 'waiting_for_wish')
@@ -113,7 +113,7 @@ def save_wish(call):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
@@ -126,10 +126,11 @@ def save_wish(call):
 
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(InlineKeyboardButton('Меню'))
-
     bot.reply_to(call, 'Вы присоединились к игре "Тайный Санта"! 🎉', reply_markup=markup)
-    notify_all_participants(f'{call.from_user.first_name} {call.from_user.last_name if call.from_user.last_name else ""} присоединился к игре! 🎅')
+    notify_all_participants(f'{call.from_user.first_name} {call.from_user.last_name if call.from_user.last_name else ""} присоединился к игре! 🎅🏻')
     user_states[user_id] = None
+
+    show_menu(call)
 
 def leave(call):
     user_id = call.from_user.id
@@ -141,7 +142,7 @@ def leave(call):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
@@ -163,7 +164,7 @@ def admin_login(call):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
@@ -182,9 +183,9 @@ def check_admin_password(call):
         conn.close()
         admin_states[user_id] = 'admin_logged_in'
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Начать игру', callback_data='start_game'))
-        markup.add(InlineKeyboardButton('Список участников', callback_data='list'))
-        markup.add(InlineKeyboardButton('Очистить список участников', callback_data='clear'))
+        markup.add(InlineKeyboardButton('Начать игру 🎅🏻', callback_data='start_game'))
+        markup.add(InlineKeyboardButton('Список участников 🎄', callback_data='list'))
+        markup.add(InlineKeyboardButton('Очистить список участников 🗑️', callback_data='clear'))
         bot.reply_to(call, 'Вы вошли в режим администратора. 👑', reply_markup=markup)
     else:
         admin_states[user_id] = None
@@ -202,7 +203,7 @@ def start_game(call):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
@@ -234,7 +235,7 @@ def start_game(call):
         if receiver_info:
             receiver_full_name = f'{receiver_info[0]} {receiver_info[1]}'
             wish = receiver_info[2] if receiver_info[2] else 'не указано'
-            bot.send_message(giver, f'Вы Тайный Санта для {receiver_full_name}! 🎅\nПожелание: {wish}')
+            bot.send_message(giver, f'Вы Тайный Санта для {receiver_full_name}! 🎅🏻\nПожелание: {wish}')
 
     conn.close()
     game_started = True
@@ -250,7 +251,7 @@ def list_participants(call):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
@@ -261,7 +262,7 @@ def list_participants(call):
     conn.close()
     if participants:
         participant_names = [f'{row[0]} {row[1]}' if row[1] else row[0] for row in participants]
-        bot.reply_to(call.message, 'Текущие участники:\n' + '\n'.join(participant_names) + ' 🎅')
+        bot.reply_to(call.message, 'Текущие участники:\n' + '\n'.join(participant_names) + ' 🎅🏻')
     else:
         bot.reply_to(call.message, 'Пока нет участников. 😞')
 
@@ -275,7 +276,7 @@ def clear_participants(call):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
     
@@ -298,7 +299,7 @@ def throw_snowball(call):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
@@ -331,7 +332,7 @@ def throw_snowball_to_user(call, target_user_id):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
@@ -404,7 +405,7 @@ def change_wish(call):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
@@ -418,7 +419,7 @@ def change_wish(call):
         return
 
     user_id = call.from_user.id
-    bot.reply_to(call.message, 'Пожалуйста, напишите ваше новое пожелание (подарок, который вы хотите):')
+    bot.reply_to(call.message, 'Пожалуйста, напишите ваше новое пожелание (подарок, который вы хотите): 🎁')
     user_states[user_id] = 'waiting_for_wish_change'
 
 @bot.message_handler(func=lambda call: user_states.get(call.from_user.id) == 'waiting_for_wish_change')
@@ -445,7 +446,7 @@ def show_profile(call):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
 
@@ -475,7 +476,7 @@ def generate_story(call):
 
     if user_info is None:
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре', callback_data='join'))
+        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
         
@@ -506,7 +507,7 @@ def generate_story(call):
     )
 
     # Отправляем сообщение пользователю, что нужно немного подождать
-    bot.send_message(call.message.chat.id, 'Пожалуйста, подождите немного, пока генерируется ваша история...')
+    bot.send_message(call.message.chat.id, 'Эльфы Санты очень трудятся, чтобы быстро написать рассказ! 🧝🏻\nПожалуйста, подождите немного...')
 
     # Отправляем запрос к Mistral API
     api_key = 'utxpKKoTJR5vVUs99Y1i5cnfS7eJ7IG5'
@@ -540,11 +541,11 @@ def show_menu(message):
         return
 
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton('Покинуть игру', callback_data='leave'))
-    markup.add(InlineKeyboardButton('Список участников', callback_data='list'))
-    markup.add(InlineKeyboardButton('Кинуть снежок', callback_data='snowball'))
-    markup.add(InlineKeyboardButton('Новогодний рассказ', callback_data='story'))
-    markup.add(InlineKeyboardButton('Мой профиль', callback_data='profile'))
+    markup.add(InlineKeyboardButton('Покинуть игру 😞', callback_data='leave'))
+    markup.add(InlineKeyboardButton('Список участников 🎄', callback_data='list'))
+    markup.add(InlineKeyboardButton('Кинуть снежок ❄️', callback_data='snowball'))
+    markup.add(InlineKeyboardButton('Новогодний рассказ ☃️', callback_data='story'))
+    markup.add(InlineKeyboardButton('Мой профиль 🪪', callback_data='profile'))
     bot.send_message(message.chat.id, 'Меню действий:', reply_markup=markup)
 
 if __name__ == '__main__':
