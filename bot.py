@@ -74,6 +74,9 @@ def handle_callback(call):
     elif call.data.startswith('snowball_'):
         target_user_id = call.data.split('_')[1]
         throw_snowball_to_user(call, target_user_id)
+    elif call.data.startswith('throw_back_'):
+        target_user_id = call.data.split('_')[2]
+        throw_snowball_to_user(call, target_user_id)
     elif call.data == 'change_wish':
         change_wish(call)
     elif call.data == 'start_game':
@@ -262,7 +265,7 @@ def list_participants(call):
     conn.close()
     if participants:
         participant_names = [f'{row[0]} {row[1]}' if row[1] else row[0] for row in participants]
-        bot.reply_to(call.message, 'Текущие участники:\n' + '\n'.join(participant_names) + ' 🎅🏻')
+        bot.reply_to(call.message, 'Текущие участники:\n✨\n' + '\n'.join(participant_names) + '\n✨')
     else:
         bot.reply_to(call.message, 'Пока нет участников. 😞')
 
@@ -354,7 +357,9 @@ def throw_snowball_to_user(call, target_user_id):
 
     if outcome <= 50:
         # Попал в цель
-        bot.send_message(target_user_id, f'{call.from_user.first_name} кинул в вас снежок и попал! ❄️')
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('Кинуть в ответ', callback_data=f'throw_back_{user_id}_{target_user_id}'))
+        bot.send_message(target_user_id, f'{call.from_user.first_name} кинул в вас снежок и попал! ❄️', reply_markup=markup)
         bot.reply_to(call.message, f'Вы попали в {target_full_name} снежком! ❄️')
     elif outcome <= 80:
         # Промазал
