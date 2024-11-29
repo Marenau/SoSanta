@@ -1,6 +1,7 @@
 import telebot
 import sqlite3
 import random
+import string
 from config import BOT_TOKEN, DATABASE, ADMIN_PASSWORD
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup
 from mistralai import Mistral
@@ -17,7 +18,8 @@ def init_db():
             user_id INTEGER UNIQUE,
             first_name TEXT,
             last_name TEXT,
-            wish TEXT
+            wish TEXT,
+            room_code TEXT
         )
     ''')
     cursor.execute('''
@@ -34,11 +36,13 @@ def init_db():
         )
     ''')
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS game_status (
-            status TEXT
+        CREATE TABLE IF NOT EXISTS rooms (
+            code TEXT PRIMARY KEY,
+            name TEXT,
+            description TEXT,
+            status TEXT DEFAULT 'not_started'
         )
     ''')
-    cursor.execute('INSERT OR IGNORE INTO game_status (status) VALUES ("not_started")')
     conn.commit()
     conn.close()
 
@@ -50,18 +54,20 @@ admin_states = {}
 # Словарь для хранения состояния пользователей
 user_states = {}
 
-# Флаг для отслеживания состояния игры
-game_started = False
-
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
+    markup.add(InlineKeyboardButton('Создать комнату 🎅🏻', callback_data='create_room'))
+    markup.add(InlineKeyboardButton('Присоединиться к комнате 🎅🏻', callback_data='join_room'))
     bot.reply_to(message, 'Добро пожаловать в волшебный мир "Тайного Санты"! 🎄✨', reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
-    if call.data == 'join':
+    if call.data == 'create_room':
+        create_room(call)
+    elif call.data == 'join_room':
+        join_room(call)
+    elif call.data == 'join':
         join(call)
     elif call.data == 'leave':
         leave(call)
@@ -87,53 +93,104 @@ def handle_callback(call):
         show_profile(call)
     elif call.data == 'story':
         generate_story(call)
+    elif call.data == 'manage_room':
+        manage_room(call)
+    elif call.data == 'delete_room':
+        delete_room(call)
+    elif call.data == 'view_participants':
+        view_participants(call)
+    elif call.data == 'start_room_game':
+        start_room_game(call)
 
 @bot.message_handler(func=lambda message: message.text.lower() == 'меню')
 def handle_menu_command(message):
     show_menu(message)
 
-def join(call):
+def create_room(call):
     user_id = call.from_user.id
-    first_name = call.from_user.first_name
-    last_name = call.from_user.last_name
+    user_states[user_id] = 'waiting_for_room_name'
+    bot.send_message(call.message.chat.id, 'Пожалуйста, введите наименование комнаты:')
+
+@bot.message_handler(func=lambda message: user_states.get(message.from_user.id) == 'waiting_for_room_name')
+def save_room_name(message):
+    user_id = message.from_user.id
+    room_name = message.text
+    user_states[user_id] = 'waiting_for_room_description'
+    bot.send_message(message.chat.id, 'Пожалуйста, введите описание комнаты:')
+    user_states[user_id] = {'room_name': room_name}
+
+@bot.message_handler(func=lambda message: isinstance(user_states.get(message.from_user.id), dict) and 'room_name' in user_states[message.from_user.id])
+def save_room_description(message):
+    user_id = message.from_user.id
+    room_description = message.text
+    room_name = user_states[user_id]['room_name']
+    room_code = generate_room_code()
+
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    cursor.execute('INSERT OR IGNORE INTO participants (user_id, first_name, last_name) VALUES (?, ?, ?)', (user_id, first_name, last_name))
+    cursor.execute('INSERT INTO rooms (code, name, description) VALUES (?, ?, ?)', (room_code, room_name, room_description))
     conn.commit()
     conn.close()
 
-    bot.send_message(call.message.chat.id, 'Пожалуйста, напишите ваше новогоднее пожелание (подарок, который вы хотите): 🎁')
-    user_states[user_id] = 'waiting_for_wish'
-
-@bot.message_handler(func=lambda call: user_states.get(call.from_user.id) == 'waiting_for_wish')
-def save_wish(call):
-    user_id = call.from_user.id
+    # Добавляем создателя комнаты в комнату
+    first_name = message.from_user.first_name
+    last_name = message.from_user.last_name
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
-    user_info = cursor.fetchone()
+    cursor.execute('INSERT OR IGNORE INTO participants (user_id, first_name, last_name, room_code) VALUES (?, ?, ?, ?)', (user_id, first_name, last_name, room_code))
+    conn.commit()
     conn.close()
 
-    if user_info is None:
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
-        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
-        return
+    user_states[user_id] = None
+    bot.send_message(message.chat.id, f'Комната создана!\nКод: {room_code}\nНаименование: {room_name}\nОписание: {room_description}')
 
-    wish = call.text
+def generate_room_code():
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+
+def join_room(call):
+    user_id = call.from_user.id
+    user_states[user_id] = 'waiting_for_room_code'
+    bot.send_message(call.message.chat.id, 'Пожалуйста, введите код комнаты:')
+
+@bot.message_handler(func=lambda message: user_states.get(message.from_user.id) == 'waiting_for_room_code')
+def save_room_code(message):
+    user_id = message.from_user.id
+    room_code = message.text
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    cursor.execute('UPDATE participants SET wish = ? WHERE user_id = ?', (wish, user_id))
+    cursor.execute('SELECT * FROM rooms WHERE code = ?', (room_code,))
+    room = cursor.fetchone()
+    conn.close()
+
+    if room:
+        user_states[user_id] = 'waiting_for_wish'
+        bot.send_message(message.chat.id, 'Пожалуйста, напишите ваше новогоднее пожелание (подарок, который вы хотите): 🎁')
+        user_states[user_id] = {'room_code': room_code}
+    else:
+        bot.send_message(message.chat.id, 'Комната с таким кодом не найдена. Пожалуйста, попробуйте снова.')
+        user_states[user_id] = None
+
+@bot.message_handler(func=lambda message: isinstance(user_states.get(message.from_user.id), dict) and 'room_code' in user_states[message.from_user.id])
+def save_wish(message):
+    user_id = message.from_user.id
+    room_code = user_states[user_id]['room_code']
+    wish = message.text
+    first_name = message.from_user.first_name
+    last_name = message.from_user.last_name
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR IGNORE INTO participants (user_id, first_name, last_name, wish, room_code) VALUES (?, ?, ?, ?, ?)', (user_id, first_name, last_name, wish, room_code))
     conn.commit()
     conn.close()
 
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(InlineKeyboardButton('Меню'))
-    bot.reply_to(call, 'Вы присоединились к игре "Тайный Санта"! 🎉', reply_markup=markup)
-    notify_all_participants(f'{call.from_user.first_name} {call.from_user.last_name if call.from_user.last_name else ""} присоединился к игре! 🎅🏻')
+    bot.reply_to(message, 'Вы присоединились к игре "Тайный Санта"! 🎉', reply_markup=markup)
+    notify_all_participants(f'{message.from_user.first_name} {message.from_user.last_name if message.from_user.last_name else ""} присоединился к игре! 🎅🏻')
     user_states[user_id] = None
 
-    show_menu(call)
+    show_menu(message)
 
 def leave(call):
     user_id = call.from_user.id
@@ -189,34 +246,104 @@ def check_admin_password(call):
         markup.add(InlineKeyboardButton('Начать игру 🎅🏻', callback_data='start_game'))
         markup.add(InlineKeyboardButton('Список участников 🎄', callback_data='list'))
         markup.add(InlineKeyboardButton('Очистить список участников 🗑️', callback_data='clear'))
+        markup.add(InlineKeyboardButton('Управление комнатой 🏠', callback_data='manage_room'))
         bot.reply_to(call, 'Вы вошли в режим администратора. 👑', reply_markup=markup)
     else:
         admin_states[user_id] = None
         bot.reply_to(call, 'Неверный пароль. ❌')
 
-def start_game(call):
-    global game_started
-
+def manage_room(call):
     user_id = call.from_user.id
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    cursor.execute('SELECT first_name, last_name, wish FROM participants WHERE user_id = ?', (user_id,))
-    user_info = cursor.fetchone()
+    cursor.execute('SELECT room_code FROM participants WHERE user_id = ?', (user_id,))
+    room_code = cursor.fetchone()
     conn.close()
 
-    if user_info is None:
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
-        bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
+    if room_code is None:
+        bot.send_message(call.message.chat.id, 'Вы не являетесь участником комнаты.')
+        return
+
+    room_code = room_code[0]
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton('Просмотреть участников 🎄', callback_data='view_participants'))
+    markup.add(InlineKeyboardButton('Начать игру 🎅🏻', callback_data='start_room_game'))
+    bot.send_message(call.message.chat.id, 'Меню управления комнатой:', reply_markup=markup)
+
+def delete_room(call):
+    user_id = call.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT room_code FROM participants WHERE user_id = ?', (user_id,))
+    room_code = cursor.fetchone()
+    conn.close()
+
+    if room_code is None:
+        bot.send_message(call.message.chat.id, 'Вы не являетесь участником комнаты.')
+        return
+
+    room_code = room_code[0]
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT user_id FROM participants WHERE room_code = ?', (room_code,))
+    participants = cursor.fetchall()
+    conn.close()
+
+    if participants and participants[0][0] == user_id:
+        bot.send_message(call.message.chat.id, 'Вы не можете удалить комнату, так как являетесь её создателем.')
         return
 
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
+    cursor.execute('DELETE FROM rooms WHERE code = ?', (room_code,))
+    cursor.execute('DELETE FROM participants WHERE room_code = ?', (room_code,))
+    conn.commit()
+    conn.close()
+    bot.send_message(call.message.chat.id, 'Комната удалена. 🗑️')
 
-    cursor.execute('SELECT user_id, first_name, last_name, wish FROM participants')
+def view_participants(call):
+    user_id = call.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT room_code FROM participants WHERE user_id = ?', (user_id,))
+    room_code = cursor.fetchone()
+    conn.close()
+
+    if room_code is None:
+        bot.send_message(call.message.chat.id, 'Вы не являетесь участником комнаты.')
+        return
+
+    room_code = room_code[0]
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT first_name, last_name FROM participants WHERE room_code = ?', (room_code,))
+    participants = cursor.fetchall()
+    conn.close()
+    if participants:
+        participant_names = [f'{row[0]} {row[1]}' if row[1] else row[0] for row in participants]
+        bot.send_message(call.message.chat.id, 'Текущие участники:\n✨\n' + '\n'.join(participant_names) + '\n✨')
+    else:
+        bot.send_message(call.message.chat.id, 'Пока нет участников. 😞')
+
+def start_room_game(call):
+    user_id = call.from_user.id
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT room_code FROM participants WHERE user_id = ?', (user_id,))
+    room_code = cursor.fetchone()
+    conn.close()
+
+    if room_code is None:
+        bot.send_message(call.message.chat.id, 'Вы не являетесь участником комнаты.')
+        return
+
+    room_code = room_code[0]
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT user_id, first_name, last_name, wish FROM participants WHERE room_code = ?', (room_code,))
     participants = cursor.fetchall()
     if len(participants) < 3:
-        bot.reply_to(call.message, 'Недостаточно участников для начала игры. 😕')
+        bot.send_message(call.message.chat.id, 'Недостаточно участников для начала игры. 😕')
         return
 
     participants = [(row[0], row[1], row[2], row[3]) for row in participants]
@@ -227,9 +354,9 @@ def start_game(call):
         receiver = participants[(i + 1) % len(participants)]
         assignments.append((giver[0], receiver[0]))
 
-    cursor.execute('DELETE FROM assignments')
+    cursor.execute('DELETE FROM assignments WHERE giver_id IN (SELECT user_id FROM participants WHERE room_code = ?) OR receiver_id IN (SELECT user_id FROM participants WHERE room_code = ?)', (room_code, room_code))
     cursor.executemany('INSERT INTO assignments (giver_id, receiver_id) VALUES (?, ?)', assignments)
-    cursor.execute('UPDATE game_status SET status = "started"')
+    cursor.execute('UPDATE rooms SET status = "started" WHERE code = ?', (room_code,))
     conn.commit()
 
     for giver, receiver in assignments:
@@ -241,8 +368,7 @@ def start_game(call):
             bot.send_message(giver, f'Вы Тайный Санта для {receiver_full_name}! 🎅🏻\nПожелание: {wish}')
 
     conn.close()
-    game_started = True
-    bot.reply_to(call.message, 'Игра "Тайный Санта" началась! Проверьте свои личные сообщения, чтобы узнать, кому вы Тайный Санта. 🎁')
+    bot.send_message(call.message.chat.id, 'Игра "Тайный Санта" началась! Проверьте свои личные сообщения, чтобы узнать, кому вы Тайный Санта. 🎁')
 
 def list_participants(call):
     user_id = call.from_user.id
@@ -282,12 +408,12 @@ def clear_participants(call):
         markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
-    
+
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('DELETE FROM participants')
     cursor.execute('DELETE FROM assignments')
-    cursor.execute('UPDATE game_status SET status = "not_started"')
+    cursor.execute('UPDATE rooms SET status = "not_started"')
     conn.commit()
     conn.close()
     bot.reply_to(call.message, 'Список участников очищен. 🗑️')
@@ -416,7 +542,7 @@ def change_wish(call):
 
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    cursor.execute('SELECT status FROM game_status')
+    cursor.execute('SELECT status FROM rooms WHERE code = (SELECT room_code FROM participants WHERE user_id = ?)', (user_id,))
     status = cursor.fetchone()[0]
     conn.close()
     if status == 'started':
@@ -484,7 +610,7 @@ def generate_story(call):
         markup.add(InlineKeyboardButton('Присоединиться к игре 🎅🏻', callback_data='join'))
         bot.send_message(call.message.chat.id, 'Вы еще не присоединились к игре. Пожалуйста, присоединитесь к игре, чтобы всё заработало.', reply_markup=markup)
         return
-        
+
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('SELECT first_name, last_name FROM participants')
@@ -508,7 +634,7 @@ def generate_story(call):
         f"Ты профессиональный писатель историй, ты пишешь очень интересные истории, очень красивым языком, ты владеешь написанием рассказов и историй в мастерстве. "
         f"Тебе нужно написать короткий новогодний рассказ с законченной концовкой. Ты должен ответить мне только историей и ничем больше, ничего лишнего писать не надо, "
         f"от тебя я должен получить только историю. При написании истории ориентируйся на пол участника по имени и используй соответствующие склонения/спряжения и местоимения. "
-        f"При каждом моем сообщении пиши разные рассказы, они не должны повторятся. В истории не должно быть романтического подтекста. Тема: Новый год, новогодняя тематика, новогодние развлечения. Участники: {', '.join(participant_names)}. Настроение: {mood}"
+        f"При каждом моем сообщении пиши разные рассказы, они не должны повторяться. В истории не должно быть романтического подтекста. Тема: Новый год, новогодняя тематика, новогодние развлечения. Участники: {', '.join(participant_names)}. Настроение: {mood}"
     )
 
     # Отправляем сообщение пользователю, что нужно немного подождать
